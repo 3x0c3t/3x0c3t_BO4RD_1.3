@@ -5,12 +5,15 @@
 #include <TFT_eSPI.h>
 #include <ESP8266WiFi.h>
 
+extern int wifiNetworkCount;
+extern bool wifiScanRunning;
+extern bool wifiListNeedsRedraw;
 
-// ========================================
-// PROTOTYPES
-// ========================================
+
+// === PROTOTYPES ===
 
 void drawWiFiList(TFT_eSPI &tft);
+
 
 // === PROTOTYPES - END
 
@@ -27,6 +30,9 @@ void drawApplication(
   const int16_t w =
     tft.width();
 
+  const int16_t h =
+    tft.height();
+
 
   tft.fillScreen(
     TFT_BLACK
@@ -37,14 +43,13 @@ void drawApplication(
   // HEADER
   // ========================================
 
-  // Header remonté de 15 px
-  // Hauteur : 19 px
+  const int16_t HEADER_HEIGHT = 24;
 
   tft.fillRect(
     0,
     0,
     w,
-    19,
+    HEADER_HEIGHT,
     TFT_DARKGREY
   );
 
@@ -58,7 +63,9 @@ void drawApplication(
     TFT_DARKGREY
   );
 
-  tft.setTextSize(1);
+  tft.setTextSize(
+    1
+  );
 
 
   tft.drawString(
@@ -69,12 +76,12 @@ void drawApplication(
 
 
   // ========================================
-  // SEPARATEUR
+  // HEADER SEPARATOR
   // ========================================
 
   tft.drawFastHLine(
     0,
-    19,
+    HEADER_HEIGHT,
     w,
     TFT_WHITE
   );
@@ -89,30 +96,25 @@ void drawApplication(
     TFT_BLACK
   );
 
-  tft.setTextSize(2);
-
-
   tft.drawString(
     "WIFI",
     6,
-    25
+    29
   );
 
 
   // ========================================
-  // SCAN STATUS
+  // SCAN
   // ========================================
 
   tft.setTextDatum(
     TR_DATUM
   );
 
-  tft.setTextSize(1);
-
   tft.drawString(
     "SCAN",
     w - 6,
-    31
+    29
   );
 
 
@@ -130,6 +132,7 @@ void drawApplication(
   );
 }
 
+
 // === APPLICATION - END
 
 
@@ -142,20 +145,27 @@ void drawWiFiList(
   TFT_eSPI &tft
 ) {
 
-  const int16_t startY = 52;
+  const int16_t w =
+    tft.width();
 
-  const int16_t rowHeight = 28;
+  const int16_t h =
+    tft.height();
 
 
-  // ========================================
-  // CLEAR LIST AREA
-  // ========================================
+  const int16_t startY =
+    52;
+
+  const int16_t rowHeight =
+    28;
+
+
+  // Efface uniquement la liste
 
   tft.fillRect(
     0,
     startY,
-    tft.width(),
-    tft.height() - startY,
+    w,
+    h - startY,
     TFT_BLACK
   );
 
@@ -168,18 +178,19 @@ void drawWiFiList(
     wifiScanRunning
   ) {
 
+    tft.setTextDatum(
+      TL_DATUM
+    );
+
     tft.setTextColor(
       TFT_YELLOW,
       TFT_BLACK
     );
 
-    tft.setTextSize(1);
-
-
     tft.drawString(
       "SCAN WIFI...",
       6,
-      startY + 5
+      startY
     );
 
     return;
@@ -195,17 +206,14 @@ void drawWiFiList(
   ) {
 
     tft.setTextColor(
-      TFT_RED,
+      TFT_LIGHTGREY,
       TFT_BLACK
     );
-
-    tft.setTextSize(1);
-
 
     tft.drawString(
       "AUCUN RESEAU",
       6,
-      startY + 5
+      startY
     );
 
     return;
@@ -213,41 +221,37 @@ void drawWiFiList(
 
 
   // ========================================
-  // NUMBER OF DISPLAYABLE NETWORKS
+  // NETWORK LIST
   // ========================================
 
-  int maxRows =
-    min(
-      wifiNetworkCount,
-      (tft.height() - startY - 2)
-      / rowHeight
-    );
+  tft.setTextDatum(
+    TL_DATUM
+  );
 
-
-  // ========================================
-  // NETWORKS
-  // ========================================
 
   for (
     int i = 0;
-    i < maxRows;
+    i < wifiNetworkCount;
     i++
   ) {
 
-    const int y =
-      startY +
-      (i * rowHeight);
+    const int16_t y =
+      startY + (i * rowHeight);
 
 
-    // ======================================
-    // SSID
-    // ======================================
+    if (
+      y + rowHeight >
+      h
+    ) {
+
+      break;
+    }
+
 
     String ssid =
       WiFi.SSID(i);
 
 
-    // Réseau masqué
     if (
       ssid.length() == 0
     ) {
@@ -257,117 +261,83 @@ void drawWiFiList(
     }
 
 
-    // Limitation largeur
-    if (
-      ssid.length() > 24
-    ) {
-
-      ssid =
-        ssid.substring(
-          0,
-          24
-        );
-    }
-
-
-    // ======================================
-    // RSSI
-    // ======================================
-
-    int rssi =
-      WiFi.RSSI(i);
-
-
-    // ======================================
-    // CHANNEL
-    // ======================================
-
-    int channel =
-      WiFi.channel(i);
-
-
-    // ======================================
-    // NETWORK NUMBER
-    // ======================================
-
-    tft.setTextDatum(
-      TL_DATUM
-    );
+    // SSID
 
     tft.setTextColor(
       TFT_WHITE,
       TFT_BLACK
     );
 
-    tft.setTextSize(1);
-
-
     tft.drawString(
-      String(i + 1),
-      5,
-      y + 2
+      ssid,
+      6,
+      y
     );
 
 
-    // ======================================
-    // SSID
-    // ======================================
+    // RSSI
+
+    tft.setTextDatum(
+      TR_DATUM
+    );
+
+    tft.setTextColor(
+      TFT_GREEN,
+      TFT_BLACK
+    );
+
+    String rssi =
+      String(
+        WiFi.RSSI(i)
+      );
+
+    rssi +=
+      " dBm";
+
+    tft.drawString(
+      rssi,
+      w - 6,
+      y
+    );
+
+
+    // CHANNEL
+
+    tft.setTextDatum(
+      TL_DATUM
+    );
+
+    String channel =
+      "CH ";
+
+    channel +=
+      String(
+        WiFi.channel(i)
+      );
 
     tft.setTextColor(
       TFT_CYAN,
       TFT_BLACK
     );
 
-    tft.setTextSize(1);
-
-
     tft.drawString(
-      ssid,
-      22,
-      y + 2
+      channel,
+      6,
+      y + 13
     );
 
 
-    // ======================================
-    // RSSI + CHANNEL
-    // ======================================
-
-    tft.setTextColor(
-      TFT_LIGHTGREY,
-      TFT_BLACK
-    );
-
-
-    String info =
-      String(rssi) +
-      "dBm  CH" +
-      String(channel);
-
-
-    tft.drawString(
-      info,
-      22,
-      y + 14
-    );
-
-
-    // ======================================
     // SEPARATOR
-    // ======================================
 
     tft.drawFastHLine(
-      5,
-      y + rowHeight - 2,
-      tft.width() - 10,
+      0,
+      y + rowHeight - 1,
+      w,
       TFT_DARKGREY
     );
   }
-
-
-  tft.setTextDatum(
-    TL_DATUM
-  );
 }
+
 
 // === WIFI LIST - END
 
